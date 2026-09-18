@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sikumbang - Scraping Perumahan Subsidi</title>
+    <style>
+        :root {
+            --primary: #1a56db;
+            --primary-hover: #1648b8;
+            --danger: #dc2626;
+            --success: #16a34a;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --selected-bg: #eff6ff;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+        }
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header .subtitle { font-size: 12px; opacity: 0.85; }
+        .container { max-width: 1600px; margin: 0 auto; padding: 16px; }
+
+        /* Stats bar */
+        .stats-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+        }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 18px; font-weight: 700; color: var(--primary); }
+
+        /* Filter panel */
+        .filter-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+        }
+        .filter-row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            flex: 1;
+            min-width: 180px;
+        }
+        .filter-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        .filter-group select,
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            background: var(--surface);
+            color: var(--text);
+            outline: none;
+        }
+        .filter-group select:focus,
+        .filter-group input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(26,86,219,0.15);
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s;
+            white-space: nowrap;
+        }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #15803d; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+        .btn-outline {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover { background: #f1f5f9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Selection bar */
+        .selection-bar {
+            background: var(--selected-bg);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .selection-bar .info {
+            font-size: 13px;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        .selection-bar .actions { display: flex; gap: 8px; }
+        .export-filtered-bar {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+            margin-bottom: 12px;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table-scroll { overflow-x: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        thead th {
+            background: #f1f5f9;
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border-bottom: 2px solid var(--border);
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        tbody td {
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            max-width: 250px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        tbody tr:hover { background: #f8fafc; }
+        tbody tr.selected { background: var(--selected-bg); }
+        td.harga { text-align: right; font-variant-numeric: tabular-nums; }
+        td.number { text-align: center; }
+        td a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        td a:hover { text-decoration: underline; }
+        td input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+        }
+        .pagination .page-info { font-size: 13px; color: var(--text-secondary); }
+        .pagination .page-btns { display: flex; gap: 4px; align-items: center; }
+        .page-btn {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            background: var(--surface);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .page-btn:hover { background: #f1f5f9; }
+        .page-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .page-input { width: 50px; text-align: center; }
+
+        /* Load progress */
+        .load-progress { padding: 12px 16px; }
+        .load-progress-text { font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+        .load-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .load-progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .load-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-size: 13px;
+            color: var(--primary);
+        }
+        .load-info .btn { margin-left: 8px; }
+
+        /* Loading */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.7);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        .loading-overlay.active { display: flex; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 4px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+        .empty-state p { font-size: 14px; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .filter-group { min-width: 100%; }
+            .header { flex-direction: column; gap: 4px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div>
+            <h1>Sikumbang - Scraping Perumahan Subsidi</h1>
+            <div class="subtitle">sikumbang.tapera.go.id</div>
+        </div>
+        <div style="font-size:12px; opacity:0.8;">v1.0</div>
+    </div>
+
+    <div class="container">
+        <!-- Stats -->
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-item">
+                <span class="stat-label">Total Lokasi</span>
+                <span class="stat-value" id="statTotal">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Unit Subsidi</span>
+                <span class="stat-value" id="statSubsidi">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Unit Komersil</span>
+                <span class="stat-value" id="statKomersil">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Pengembang</span>
+                <span class="stat-value" id="statPengembang">-</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Data di Halaman Ini</span>
+                <span class="stat-value" id="statPageCount">-</span>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-panel">
+            <div class="filter-row">
+                <div class="filter-group">
+                    <label>Provinsi</label>
+                    <select id="filterProvinsi">
+                        <option value="">Semua Provinsi</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Kabupaten / Kota</label>
+                    <select id="filterKabupaten" disabled>
+                        <option value="">Semua Kab/Kota</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Asosiasi</label>
+                    <select id="filterAsosiasi">
+                        <option value="">Semua Asosiasi</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="filterStatus">
+                        <option value="">Semua</option>
+                        <option value="subsidi">Subsidi</option>
+                        <option value="komersil">Komersil</option>
+                    </select>
+                </div>
+                <div class="filter-group" style="flex:1.5;">
+                    <label>Search Nama Perumahan</label>
+                    <input type="text" id="searchInput" placeholder="Ketik nama perumahan...">
+                </div>
+                <div class="filter-group" style="flex:0;">
+                    <label>&nbsp;</label>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn btn-primary" onclick="applyFilter()">Filter</button>
+                        <button class="btn btn-outline" onclick="resetFilter()">Reset</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Selection bar -->
+        <div class="selection-bar" id="selectionBar">
+            <div class="info">
+                <span id="selectedCount">0</span> lokasi dipilih
+                <button class="btn btn-outline" style="margin-left:8px; padding:4px 10px; font-size:11px;" onclick="clearSelection()" id="btnClearSelection">Hapus Semua</button>
+            </div>
+            <div class="actions">
+                <button class="btn btn-success" onclick="exportCSV()" id="btnExportCSV" disabled>Export CSV (Selected)</button>
+                <button class="btn btn-primary" onclick="exportXLSX()" id="btnExportXLSX" disabled>Export XLSX (Selected)</button>
+            </div>
+        </div>
+
+        <!-- Export filtered bar -->
+        <div class="export-filtered-bar" id="exportFilteredBar">
+            <button class="btn btn-success" onclick="exportFilteredCSV()" title="Export semua data yang sedang ditampilkan di tabel">Export Semua (CSV)</button>
+            <button class="btn btn-primary" onclick="exportFilteredXLSX()" title="Export semua data yang sedang ditampilkan di tabel">Export Semua (XLSX)</button>
+        </div>
+
+        <!-- Load All Data bar -->
+        <div class="load-info" id="loadAllBar">
+            <div>
+                <span id="loadAllStatus">Data halaman pertama sudah dimuat. Pilih provinsi/kabupaten lalu klik <strong>Filter</strong> untuk load semua data.</span>
+            </div>
+            <div>
+                <button class="btn btn-primary" onclick="loadAllAndFilter()" id="btnLoadAll">Load Semua Data</button>
+            </div>
+        </div>
+
+        <!-- Load progress -->
+        <div id="loadProgress" style="display:none;"></div>
+
+        <!-- Table -->
+        <div class="table-container">
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+                            <th>ID Lokasi</th>
+                            <th>Nama Perumahan</th>
+                            <th>Provinsi</th>
+                            <th>Kab/Kota</th>
+                            <th>Kecamatan</th>
+                            <th>Tipe</th>
+                            <th>Status</th>
+                            <th style="text-align:right;">Harga</th>
+                            <th style="text-align:center;">LT (m²)</th>
+                            <th style="text-align:center;">LB (m²)</th>
+                            <th style="text-align:center;">KT/KM</th>
+                            <th style="text-align:center;">Unit</th>
+                            <th>Pengembang</th>
+                            <th>Asosiasi</th>
+                            <th style="text-align:center;">Detail</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <tr>
+                            <td colspan="16">
+                                <div class="empty-state">
+                                    <div class="icon">&#127968;</div>
+                                    <p>Memuat data...</p>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination">
+                <div class="page-info" id="pageInfo">Memuat...</div>
+                <div class="page-btns" id="pageBtns"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div style="text-align:center;">
+            <div class="spinner"></div>
+            <div style="margin-top:12px; font-size:14px; color:#64748b;">Memuat data dari Sikumbang...</div>
+        </div>
+    </div>
+
+    <script>
+    const API = {
+        provinsi: '/api/provinsi',
+        kabupaten: (kode) => `/api/kabupaten/${kode}`,
+        lokasi: '/api/lokasi',
+        exportCsv: '/api/export/csv',
+        exportXlsx: '/api/export/xlsx',
+    };
+
+    const STORAGE_KEY = 'sikumbang_selection';
+    const PAGE_LIMIT = 100;
+    const CONCURRENT = 8;
+
+    let state = {
+        page: 1,
+        totalLokasi: 0,
+        totalPages: 0,
+        data: [],
+        allData: [],
+        allDataLoaded: false,
+        allDataLoading: false,
+        allDataCount: {},
+        filteredResults: [],
+        filteredTotal: 0,
+        count: {},
+        filters: { provinsi: '', kabupaten: '', asosiasi: '', status: '', search: '' },
+        selected: new Map(),
+        asosiasiList: [],
+        viewMode: 'paginated',
+    };
+
+    // --- localStorage ---
+    function loadSelection() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (raw) {
+                const arr = JSON.parse(raw);
+                arr.forEach(item => state.selected.set(item.idLokasi, item));
+            }
+        } catch {}
+    }
+
+    function saveSelection() {
+        const arr = Array.from(state.selected.values());
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+    }
+
+    // --- Format helpers ---
+    function formatNumber(n) {
+        if (n == null || n === '...') return '-';
+        return Number(n).toLocaleString('id-ID');
+    }
+
+    function formatHarga(n) {
+        if (!n) return '-';
+        return 'Rp ' + Number(n).toLocaleString('id-ID');
+    }
+
+    // --- API calls ---
+    async function fetchJSON(url) {
+        const resp = await fetch(url);
+        return resp.json();
+    }
+
+    async function loadProvinsi() {
+        const data = await fetchJSON(API.provinsi);
+        const sel = document.getElementById('filterProvinsi');
+        data.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.kodeWilayah;
+            opt.textContent = p.namaWilayah;
+            sel.appendChild(opt);
+        });
+    }
+
+    async function loadKabupaten(kodeProv) {
+        const sel = document.getElementById('filterKabupaten');
+        sel.innerHTML = '<option value="">Semua Kab/Kota</option>';
+        if (!kodeProv) { sel.disabled = true; return; }
+        sel.disabled = false;
+        const data = await fetchJSON(API.kabupaten(kodeProv));
+        if (Array.isArray(data)) {
+            data.forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k.kodeWilayah;
+                opt.textContent = k.namaWilayah;
+                sel.appendChild(opt);
+            });
+        }
+    }
+
+    function updateLoadProgress(current, total, loaded) {
+        const el = document.getElementById('loadProgress');
+        if (!el) return;
+        const pct = total > 0 ? Math.round((current / total) * 100) : 0;
+        el.innerHTML = `<div class="load-progress">
+            <div class="load-progress-text">Memuat semua data: ${formatNumber(loaded)} lokasi (${current}/${total} halaman) — ${pct}%</div>
+            <div class="load-progress-bar"><div class="load-progress-fill" style="width:${pct}%"></div></div>
+        </div>`;
+        el.style.display = 'block';
+    }
+
+    function hideLoadProgress() {
+        const el = document.getElementById('loadProgress');
+        if (el) el.style.display = 'none';
+    }
+
+    async function loadAllData() {
+        if (state.allDataLoaded || state.allDataLoading) return;
+        state.allDataLoading = true;
+
+        showLoadProgress(true);
+        updateLoadProgress(0, 1, 0);
+
+        try {
+            const firstParams = new URLSearchParams({ page: '1', limit: PAGE_LIMIT });
+            const searchVal = document.getElementById('searchInput').value.trim();
+            if (searchVal) {
+                firstParams.set('search', searchVal);
+                firstParams.set('searchField', 'namaPerumahan');
+            }
+
+            const firstResp = await fetchJSON(`${API.lokasi}?${firstParams}`);
+            state.allData = firstResp.data || [];
+            state.allDataCount = firstResp.count || {};
+            state.totalLokasi = firstResp.count?.totalLokasi || 0;
+            state.totalPages = Math.ceil(state.totalLokasi / PAGE_LIMIT);
+
+            updateLoadProgress(1, state.totalPages, state.allData.length);
+
+            for (let batch = 2; batch <= state.totalPages; batch += CONCURRENT) {
+                const promises = [];
+                for (let p = batch; p < batch + CONCURRENT && p <= state.totalPages; p++) {
+                    const pageParams = new URLSearchParams({ page: String(p), limit: PAGE_LIMIT });
+                    if (searchVal) {
+                        pageParams.set('search', searchVal);
+                        pageParams.set('searchField', 'namaPerumahan');
+                    }
+                    promises.push(
+                        fetchJSON(`${API.lokasi}?${pageParams}`)
+                            .then(d => ({ page: p, data: d.data || [] }))
+                            .catch(() => ({ page: p, data: [] }))
+                    );
+                }
+                const results = await Promise.all(promises);
+                results.sort((a, b) => a.page - b.page);
+                results.forEach(r => state.allData.push(...r.data));
+
+                const loaded = Math.min(batch + CONCURRENT - 1, state.totalPages);
+                updateLoadProgress(loaded, state.totalPages, state.allData.length);
+            }
+
+            state.allDataLoaded = true;
+            extractAsosiasi(state.allData);
+            state.count = state.allDataCount;
+            renderStats();
+        } catch (e) {
+            console.error('loadAllData error:', e);
+            renderEmpty('Gagal memuat semua data. Coba lagi.');
+        }
+
+        state.allDataLoading = false;
+        hideLoadProgress();
+    }
+
+    function showLoadProgress(show) {
+        const el = document.getElementById('loadProgress');
+        if (el) el.style.display = show ? 'block' : 'none';
+    }
+
+    async function loadData() {
+        if (state.viewMode === 'filtered' && state.allDataLoaded) {
+            applyFiltersToAllData();
+            return;
+        }
+
+        showLoading(true);
+        const params = new URLSearchParams();
+        params.set('page', state.page);
+        params.set('limit', PAGE_LIMIT);
+
+        const searchVal = document.getElementById('searchInput').value.trim();
+        if (searchVal) {
+            params.set('search', searchVal);
+            params.set('searchField', 'namaPerumahan');
+        }
+
+        try {
+            const data = await fetchJSON(`${API.lokasi}?${params}`);
+            state.data = data.data || [];
+            state.count = data.count || {};
+            state.totalLokasi = data.count?.totalLokasi || 0;
+            state.totalPages = Math.ceil(state.totalLokasi / PAGE_LIMIT);
+
+            extractAsosiasi(state.data);
+            renderStats();
+            renderTable();
+            renderPagination();
+        } catch (e) {
+            console.error('Load error:', e);
+            renderEmpty('Gagal memuat data. Coba lagi.');
+        }
+        showLoading(false);
+    }
+
+    function extractAsosiasi(data) {
+        const sel = document.getElementById('filterAsosiasi');
+        const existing = new Set(Array.from(sel.options).map(o => o.value).filter(Boolean));
+        data.forEach(item => {
+            const aso = item.pengembang?.asosiasi;
+            if (aso && !existing.has(aso)) {
+                existing.add(aso);
+                const opt = document.createElement('option');
+                opt.value = aso;
+                opt.textContent = aso;
+                sel.appendChild(opt);
+            }
+        });
+    }
+
+    // --- Client-side filtering on allData ---
+    function applyFiltersToAllData() {
+        let filtered = [...state.allData];
+        const { provinsi, kabupaten, asosiasi, status, search } = state.filters;
+
+        if (provinsi) {
+            filtered = filtered.filter(i => {
+                const code = i.wilayah?.kodeWilayah || '';
+                return code.startsWith(provinsi);
+            });
+        }
+        if (kabupaten) {
+            filtered = filtered.filter(i => {
+                const code = i.wilayah?.kodeWilayah || '';
+                return code.startsWith(kabupaten);
+            });
+        }
+        if (asosiasi) {
+            filtered = filtered.filter(i => i.pengembang?.asosiasi === asosiasi);
+        }
+        if (status) {
+            filtered = filtered.filter(i =>
+                i.tipeRumah?.some(t => t.status === status)
+            );
+        }
+        if (search) {
+            const lower = search.toLowerCase();
+            filtered = filtered.filter(i =>
+                (i.namaPerumahan || '').toLowerCase().includes(lower)
+            );
+        }
+
+        state.filteredResults = filtered;
+        state.filteredTotal = filtered.length;
+        state.totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_LIMIT));
+        state.page = Math.min(state.page, state.totalPages);
+
+        extractAsosiasi(filtered);
+        renderStatsFiltered();
+        renderFilteredTable();
+        renderFilteredPagination();
+    }
+
+    function renderStatsFiltered() {
+        document.getElementById('statTotal').textContent = formatNumber(state.allData.length);
+        document.getElementById('statSubsidi').textContent = formatNumber(state.allDataCount.countUnitSubsidi);
+        document.getElementById('statKomersil').textContent = formatNumber(state.allDataCount.countUnitKomersil);
+        document.getElementById('statPengembang').textContent = formatNumber(state.allDataCount.countPengembang);
+        document.getElementById('statPageCount').textContent = state.filteredResults.length;
+    }
+
+    function renderFilteredTable() {
+        const tbody = document.getElementById('tableBody');
+        const start = (state.page - 1) * PAGE_LIMIT;
+        const pageData = state.filteredResults.slice(start, start + PAGE_LIMIT);
+        const rows = expandRows(pageData);
+
+        if (rows.length === 0) {
+            renderEmpty('Tidak ada data ditemukan untuk filter ini.');
+            return;
+        }
+
+        let html = '';
+        rows.forEach(({ item, tipe }) => {
+            const id = item.idLokasi;
+            const checked = state.selected.has(id) ? 'checked' : '';
+            const selectedClass = state.selected.has(id) ? 'selected' : '';
+            const w = item.wilayah || {};
+            const p = item.pengembang || {};
+
+            const tipeNama = tipe?.nama || '-';
+            const tipeStatus = tipe?.status || '-';
+            const harga = tipe?.harga || 0;
+            const lt = tipe?.luasTanah || '-';
+            const lb = tipe?.luasBangunan || '-';
+            const kt = tipe?.kamarTidur ?? '-';
+            const km = tipe?.kamarMandi ?? '-';
+            const unit = item.jumlahUnit ?? '-';
+            const detailUrl = `https://sikumbang.tapera.go.id/lokasi-perumahan/${id}`;
+
+            html += `<tr class="${selectedClass}">
+                <td><input type="checkbox" ${checked} onchange="toggleSelect('${id}', this)"></td>
+                <td title="${id}">${id}</td>
+                <td title="${item.namaPerumahan}">${item.namaPerumahan || '-'}</td>
+                <td>${w.provinsi || '-'}</td>
+                <td>${w.kabupaten || '-'}</td>
+                <td>${w.kecamatan || '-'}</td>
+                <td>${tipeNama}</td>
+                <td><span style="color:${tipeStatus==='subsidi'?'#16a34a':'#ea580c'}; font-weight:600;">${tipeStatus}</span></td>
+                <td class="harga">${formatHarga(harga)}</td>
+                <td class="number">${lt}</td>
+                <td class="number">${lb}</td>
+                <td class="number">${kt}/${km}</td>
+                <td class="number">${unit}</td>
+                <td title="${p.nama||''}">${p.nama || '-'}</td>
+                <td>${p.asosiasi || '-'}</td>
+                <td class="number"><a href="${detailUrl}" target="_blank" title="Buka di Sikumbang">&#128270;</a></td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        document.getElementById('selectAll').checked = false;
+    }
+
+    function renderFilteredPagination() {
+        const total = state.totalPages;
+        const current = state.page;
+        document.getElementById('pageInfo').textContent =
+            `Halaman ${current} dari ${total} (${formatNumber(state.filteredTotal)} hasil filter dari ${formatNumber(state.allData.length)} total)`;
+
+        const btns = document.getElementById('pageBtns');
+        let html = '';
+        html += `<button class="page-btn" ${current <= 1 ? 'disabled' : ''} onclick="goPage(1)">«</button>`;
+        html += `<button class="page-btn" ${current <= 1 ? 'disabled' : ''} onclick="goPage(${current-1})">‹</button>`;
+
+        const range = 3;
+        let start = Math.max(1, current - range);
+        let end = Math.min(total, current + range);
+        if (start > 1) html += `<span style="padding:0 4px;">...</span>`;
+        for (let i = start; i <= end; i++) {
+            html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+        }
+        if (end < total) html += `<span style="padding:0 4px;">...</span>`;
+
+        html += `<button class="page-btn" ${current >= total ? 'disabled' : ''} onclick="goPage(${current+1})">›</button>`;
+        html += `<button class="page-btn" ${current >= total ? 'disabled' : ''} onclick="goPage(${total})">»</button>`;
+        html += `<input type="number" class="page-input" min="1" max="${total}" value="${current}" onchange="goPage(Number(this.value))">`;
+        btns.innerHTML = html;
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('tableBody');
+        let items = [...state.data];
+        const { asosiasi, status } = state.filters;
+
+        if (asosiasi) {
+            items = items.filter(i => i.pengembang?.asosiasi === asosiasi);
+        }
+        if (status) {
+            items = items.filter(i => i.tipeRumah?.some(t => t.status === status));
+        }
+
+        const rows = expandRows(items);
+
+        if (rows.length === 0) {
+            renderEmpty('Tidak ada data ditemukan untuk filter ini.');
+            return;
+        }
+
+        let html = '';
+        rows.forEach(({ item, tipe }) => {
+            const id = item.idLokasi;
+            const checked = state.selected.has(id) ? 'checked' : '';
+            const selectedClass = state.selected.has(id) ? 'selected' : '';
+            const w = item.wilayah || {};
+            const p = item.pengembang || {};
+
+            const tipeNama = tipe?.nama || '-';
+            const tipeStatus = tipe?.status || '-';
+            const harga = tipe?.harga || 0;
+            const lt = tipe?.luasTanah || '-';
+            const lb = tipe?.luasBangunan || '-';
+            const kt = tipe?.kamarTidur ?? '-';
+            const km = tipe?.kamarMandi ?? '-';
+            const unit = item.jumlahUnit ?? '-';
+            const detailUrl = `https://sikumbang.tapera.go.id/lokasi-perumahan/${id}`;
+
+            html += `<tr class="${selectedClass}">
+                <td><input type="checkbox" ${checked} onchange="toggleSelect('${id}', this)"></td>
+                <td title="${id}">${id}</td>
+                <td title="${item.namaPerumahan}">${item.namaPerumahan || '-'}</td>
+                <td>${w.provinsi || '-'}</td>
+                <td>${w.kabupaten || '-'}</td>
+                <td>${w.kecamatan || '-'}</td>
+                <td>${tipeNama}</td>
+                <td><span style="color:${tipeStatus==='subsidi'?'#16a34a':'#ea580c'}; font-weight:600;">${tipeStatus}</span></td>
+                <td class="harga">${formatHarga(harga)}</td>
+                <td class="number">${lt}</td>
+                <td class="number">${lb}</td>
+                <td class="number">${kt}/${km}</td>
+                <td class="number">${unit}</td>
+                <td title="${p.nama||''}">${p.nama || '-'}</td>
+                <td>${p.asosiasi || '-'}</td>
+                <td class="number"><a href="${detailUrl}" target="_blank" title="Buka di Sikumbang">&#128270;</a></td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+        document.getElementById('selectAll').checked = false;
+    }
+
+    function renderEmpty(msg) {
+        document.getElementById('tableBody').innerHTML = `<tr><td colspan="16">
+            <div class="empty-state">
+                <div class="icon">&#128269;</div>
+                <p>${msg}</p>
+            </div>
+        </td></tr>`;
+    }
+
+    function renderPagination() {
+        const total = state.totalPages;
+        const current = state.page;
+        document.getElementById('pageInfo').textContent =
+            `Halaman ${current} dari ${total} (${formatNumber(state.totalLokasi)} lokasi)`;
+
+        const btns = document.getElementById('pageBtns');
+        let html = '';
+        html += `<button class="page-btn" ${current <= 1 ? 'disabled' : ''} onclick="goPage(1)">«</button>`;
+        html += `<button class="page-btn" ${current <= 1 ? 'disabled' : ''} onclick="goPage(${current-1})">‹</button>`;
+
+        const range = 3;
+        let start = Math.max(1, current - range);
+        let end = Math.min(total, current + range);
+        if (start > 1) html += `<span style="padding:0 4px;">...</span>`;
+        for (let i = start; i <= end; i++) {
+            html += `<button class="page-btn ${i === current ? 'active' : ''}" onclick="goPage(${i})">${i}</button>`;
+        }
+        if (end < total) html += `<span style="padding:0 4px;">...</span>`;
+
+        html += `<button class="page-btn" ${current >= total ? 'disabled' : ''} onclick="goPage(${current+1})">›</button>`;
+        html += `<button class="page-btn" ${current >= total ? 'disabled' : ''} onclick="goPage(${total})">»</button>`;
+        html += `<input type="number" class="page-input" min="1" max="${total}" value="${current}" onchange="goPage(Number(this.value))">`;
+        btns.innerHTML = html;
+    }
+
+    function expandRows(items) {
+        const rows = [];
+        const { status: statusFilter } = state.filters;
+        items.forEach(item => {
+            const tipes = (item.tipeRumah || []).filter(t =>
+                !statusFilter || t.status === statusFilter
+            );
+            if (tipes.length === 0) {
+                rows.push({ item, tipe: null });
+            } else {
+                tipes.forEach(t => rows.push({ item, tipe: t }));
+            }
+        });
+        return rows;
+    }
+
+    // --- Selection ---
+    function findItemById(id) {
+        if (state.allDataLoaded) return state.allData.find(d => d.idLokasi === id);
+        return state.data.find(d => d.idLokasi === id);
+    }
+
+    function serializeItem(item) {
+        return {
+            idLokasi: item.idLokasi,
+            namaPerumahan: item.namaPerumahan,
+            jenisPerumahan: item.jenisPerumahan,
+            wilayah: item.wilayah,
+            pengembang: item.pengembang,
+            tipeRumah: item.tipeRumah || [],
+            jumlahUnit: item.jumlahUnit,
+            jumlahUnitKomersil: item.jumlahUnitKomersil,
+            koordinatPerumahan: item.koordinatPerumahan,
+        };
+    }
+
+    function toggleSelect(id, checkbox) {
+        if (checkbox.checked) {
+            const item = findItemById(id);
+            if (item) state.selected.set(id, serializeItem(item));
+        } else {
+            state.selected.delete(id);
+        }
+        checkbox.closest('tr').classList.toggle('selected', checkbox.checked);
+        updateSelectionBar();
+        saveSelection();
+    }
+
+    function toggleSelectAll(checkbox) {
+        const rows = document.querySelectorAll('#tableBody input[type="checkbox"]');
+        rows.forEach(cb => {
+            cb.checked = checkbox.checked;
+            const row = cb.closest('tr');
+            const id = row?.children?.[1]?.textContent;
+            if (!id) return;
+            if (checkbox.checked) {
+                const item = findItemById(id);
+                if (item) {
+                    state.selected.set(id, serializeItem(item));
+                    row.classList.add('selected');
+                }
+            } else {
+                state.selected.delete(id);
+                row.classList.remove('selected');
+            }
+        });
+        updateSelectionBar();
+        saveSelection();
+    }
+
+    function clearSelection() {
+        state.selected.clear();
+        saveSelection();
+        updateSelectionBar();
+        renderTable();
+    }
+
+    function updateSelectionBar() {
+        const count = state.selected.size;
+        document.getElementById('selectedCount').textContent = count;
+        document.getElementById('btnExportCSV').disabled = count === 0;
+        document.getElementById('btnExportXLSX').disabled = count === 0;
+        document.getElementById('btnClearSelection').disabled = count === 0;
+    }
+
+    // --- Export ---
+    async function exportCSV() {
+        const items = Array.from(state.selected.values());
+        if (items.length === 0) return alert('Pilih lokasi terlebih dahulu!');
+        await doExport(API.exportCsv, items, 'CSV');
+    }
+
+    async function exportXLSX() {
+        const items = Array.from(state.selected.values());
+        if (items.length === 0) return alert('Pilih lokasi terlebih dahulu!');
+        await doExport(API.exportXlsx, items, 'XLSX');
+    }
+
+    async function exportFilteredCSV() {
+        const items = getExportItems();
+        if (!items) return;
+        await doExport(API.exportCsv, items, 'CSV');
+    }
+
+    async function exportFilteredXLSX() {
+        const items = getExportItems();
+        if (!items) return;
+        await doExport(API.exportXlsx, items, 'XLSX');
+    }
+
+    function getExportItems() {
+        let items;
+        if (state.viewMode === 'filtered' && state.allDataLoaded) {
+            items = state.filteredResults;
+        } else {
+            items = state.data;
+        }
+        if (!items || items.length === 0) {
+            alert('Tidak ada data untuk di-export.');
+            return null;
+        }
+        return items.map(serializeItem);
+    }
+
+    async function doExport(url, items, label) {
+        showLoading(true);
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(items),
+            });
+            if (!resp.ok) throw new Error('Export gagal');
+            const blob = await resp.blob();
+            const disposition = resp.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename=([^;]+)/);
+            const filename = match ? match[1] : `sikumbang_export.${label.toLowerCase()}`;
+
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch (e) {
+            alert('Export gagal: ' + e.message);
+        }
+        showLoading(false);
+    }
+
+    // --- Navigation ---
+    function goPage(p) {
+        p = Math.max(1, Math.min(p, state.totalPages));
+        if (p === state.page) return;
+        state.page = p;
+        if (state.viewMode === 'filtered' && state.allDataLoaded) {
+            applyFiltersToAllData();
+        } else {
+            loadData();
+        }
+        window.scrollTo(0, 0);
+    }
+
+    async function applyFilter() {
+        state.page = 1;
+        state.filters.provinsi = document.getElementById('filterProvinsi').value;
+        state.filters.kabupaten = document.getElementById('filterKabupaten').value;
+        state.filters.asosiasi = document.getElementById('filterAsosiasi').value;
+        state.filters.status = document.getElementById('filterStatus').value;
+        state.filters.search = document.getElementById('searchInput').value.trim();
+
+        const hasWilayahFilter = state.filters.provinsi || state.filters.kabupaten;
+
+        if (hasWilayahFilter && !state.allDataLoaded) {
+            state.viewMode = 'filtered';
+            await loadAllData();
+            applyFiltersToAllData();
+        } else if (hasWilayahFilter && state.allDataLoaded) {
+            state.viewMode = 'filtered';
+            applyFiltersToAllData();
+        } else {
+            state.viewMode = 'paginated';
+            loadData();
+        }
+    }
+
+    function resetFilter() {
+        document.getElementById('filterProvinsi').value = '';
+        document.getElementById('filterKabupaten').value = '';
+        document.getElementById('filterKabupaten').disabled = true;
+        document.getElementById('filterAsosiasi').value = '';
+        document.getElementById('filterStatus').value = '';
+        document.getElementById('searchInput').value = '';
+        state.filters = { provinsi: '', kabupaten: '', asosiasi: '', status: '', search: '' };
+        state.page = 1;
+        if (state.allDataLoaded) {
+            state.viewMode = 'paginated';
+        }
+        loadData();
+    }
+
+    function showLoading(show) {
+        document.getElementById('loadingOverlay').classList.toggle('active', show);
+    }
+
+    async function loadAllAndFilter() {
+        const btn = document.getElementById('btnLoadAll');
+        btn.disabled = true;
+        btn.textContent = 'Loading...';
+
+        await loadAllData();
+
+        btn.textContent = state.allDataLoaded ? 'Semua Data Loaded' : 'Gagal Load';
+        document.getElementById('loadAllStatus').innerHTML =
+            `<strong>${formatNumber(state.allData.length)}</strong> lokasi sudah dimuat. Gunakan filter untuk mencari data.`;
+    }
+
+    // --- Event listeners ---
+    document.getElementById('filterProvinsi').addEventListener('change', function() {
+        loadKabupaten(this.value);
+    });
+
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            state.page = 1;
+            state.filters.search = this.value.trim();
+            loadData();
+        }, 500);
+    });
+
+    document.getElementById('searchInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            clearTimeout(searchTimeout);
+            state.page = 1;
+            state.filters.search = this.value.trim();
+            loadData();
+        }
+    });
+
+    // --- Init ---
+    (async function init() {
+        loadSelection();
+        updateSelectionBar();
+        await loadProvinsi();
+        await loadData();
+    })();
+    </script>
+</body>
+</html>
